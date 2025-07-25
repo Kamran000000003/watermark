@@ -1,19 +1,20 @@
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
+const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Create upload and output directories if they don't exist
+// Create directories
 const uploadDir = path.join(__dirname, 'uploads');
 const outputDir = path.join(__dirname, 'output');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-// Multer setup
+// Multer config
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
@@ -22,39 +23,37 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Replace with your watermark image URL (PNG recommended, transparent)
+const WATERMARK_URL = 'https://i.imgur.com/GIu8fED.png'; // sample watermark
+
+// POST route
 app.post('/', upload.single('image'), async (req, res) => {
   const inputPath = req.file.path;
   const outputPath = path.join(outputDir, `watermarked-${Date.now()}.png`);
 
   try {
+    // Download watermark from URL into a buffer
+    const response = await axios.get(WATERMARK_URL, { responseType: 'arraybuffer' });
+    const watermarkBuffer = Buffer.from(response.data);
+
+    // Composite image
     await sharp(inputPath)
-      .composite([
-        {
-          input: Buffer.from(
-            `<svg width="500" height="500">
-              <text x="10" y="50" font-size="32" fill="white" opacity="0.7">Watermark</text>
-            </svg>`
-          ),
-          gravity: 'southeast',
-        },
-      ])
+      .composite([{ input: watermarkBuffer, gravity: 'southeast' }])
       .png()
       .toFile(outputPath);
 
-    // Send the processed file
-    res.download(outputPath, 'watermarked.png', (err) => {
-      // Clean up temporary files
+    res.download(outputPath, 'watermarked.png', () => {
       fs.unlinkSync(inputPath);
       fs.unlinkSync(outputPath);
     });
-  } catch (err) {
-    console.error('Processing error:', err);
-    res.status(500).send('Error processing image');
+  } catch (error) {
+    console.error('❌ Error:', error);
+    res.status(500).send('Image processing failed');
   }
 });
 
 app.get('/', (req, res) => {
-  res.send('✅ Watermark server is up and running!');
+  res.send('✅ Watermark API is live');
 });
 
 app.listen(PORT, () => {
