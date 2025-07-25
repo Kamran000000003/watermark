@@ -1,14 +1,14 @@
 {
   "name": "watermark-server",
   "version": "1.0.0",
+  "description": "Watermark image processor for n8n",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.6.8",
     "express": "^4.18.2",
-    "multer": "^1.4.5-lts.2",
-    "sharp": "^0.33.2"
+    "jimp": "^0.22.10"
   }
 }
