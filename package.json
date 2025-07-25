@@ -1,0 +1,14 @@
+{
+  "name": "watermark-api",
+  "version": "1.0.0",
+  "description": "Simple Express API to add watermark on images using Jimp",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "express": "^4.19.2",
+    "jimp": "^0.22.10"
+  }
+}
