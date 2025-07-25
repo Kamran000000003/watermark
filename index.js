@@ -1,61 +1,49 @@
-const express = require('express');
-const multer = require('multer');
-const sharp = require('sharp');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const Jimp = require("jimp");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// Create directories
-const uploadDir = path.join(__dirname, 'uploads');
-const outputDir = path.join(__dirname, 'output');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+// Accept raw binary image uploads (e.g., from n8n HTTP Request)
+app.use(express.raw({ type: 'image/*', limit: '10mb' }));
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-const upload = multer({ storage });
-
-// Replace with your watermark image URL (PNG recommended, transparent)
-const WATERMARK_URL = 'https://i.imgur.com/GIu8fED.png'; // sample watermark
-
-// POST route
-app.post('/', upload.single('image'), async (req, res) => {
-  const inputPath = req.file.path;
-  const outputPath = path.join(outputDir, `watermarked-${Date.now()}.png`);
-
+app.post("/", async (req, res) => {
   try {
-    // Download watermark from URL into a buffer
-    const response = await axios.get(WATERMARK_URL, { responseType: 'arraybuffer' });
-    const watermarkBuffer = Buffer.from(response.data);
+    const inputBuffer = req.body;
 
-    // Composite image
-    await sharp(inputPath)
-      .composite([{ input: watermarkBuffer, gravity: 'southeast' }])
-      .png()
-      .toFile(outputPath);
+    // Read image from buffer
+    const image = await Jimp.read(inputBuffer);
 
-    res.download(outputPath, 'watermarked.png', () => {
-      fs.unlinkSync(inputPath);
-      fs.unlinkSync(outputPath);
+    // Load watermark
+    const watermark = await Jimp.read("https://iili.io/J9vTbss.md.png");
+
+    // Resize watermark
+    watermark.resize(image.bitmap.width / 4, Jimp.AUTO);
+
+    // Calculate position (bottom-right corner)
+    const x = image.bitmap.width - watermark.bitmap.width - 10;
+    const y = image.bitmap.height - watermark.bitmap.height - 10;
+
+    // Composite watermark onto image
+    image.composite(watermark, x, y, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacitySource: 0.6,
     });
+
+    // Get image buffer (PNG)
+    const outputBuffer = await image.getBufferAsync(Jimp.MIME_PNG);
+
+    // Send back
+    res.set("Content-Type", "image/png");
+    res.send(outputBuffer);
   } catch (error) {
-    console.error('❌ Error:', error);
-    res.status(500).send('Image processing failed');
+    console.error(error);
+    res.status(500).send("Failed to apply watermark");
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('✅ Watermark API is live');
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
