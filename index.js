@@ -1,47 +1,51 @@
-const express = require("express");
-const Jimp = require("jimp");
-const axios = require("axios");
-
+const express = require('express');
+const Jimp = require('jimp');
+const multer = require('multer');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// Endpoint: /watermark?imageUrl=...&watermarkUrl=...
-app.get("/watermark", async (req, res) => {
-  const { imageUrl, watermarkUrl } = req.query;
+// Configure Multer to handle binary file input
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-  if (!imageUrl || !watermarkUrl) {
-    return res.status(400).json({ error: "Missing imageUrl or watermarkUrl" });
+app.post('/watermark', upload.single('data'), async (req, res) => {
+  console.log("hi");
+  const watermarkUrl = req.query.watermarkUrl;
+  if (!req.file || !watermarkUrl) {
+    return res.status(400).json({ error: 'Missing image or watermarkUrl' });
   }
 
   try {
     const [baseImage, watermark] = await Promise.all([
-      Jimp.read(imageUrl),
-      Jimp.read(watermarkUrl),
+      Jimp.read(req.file.buffer),
+      Jimp.read(watermarkUrl)
     ]);
 
-    // Resize watermark to 30% of base image width
-    const scaleFactor = baseImage.bitmap.width * 0.3 / watermark.bitmap.width;
-    watermark.scale(scaleFactor);
+    // Resize watermark to 20% of base width
+    const watermarkResized = watermark.resize(baseImage.bitmap.width / 5, Jimp.AUTO);
 
-    // Position watermark at bottom-right
-    const x = baseImage.bitmap.width - watermark.bitmap.width - 10;
-    const y = baseImage.bitmap.height - watermark.bitmap.height - 10;
+    // Position: bottom-right
+    const x = baseImage.bitmap.width - watermarkResized.bitmap.width - 10;
+    const y = baseImage.bitmap.height - watermarkResized.bitmap.height - 10;
 
-    baseImage.composite(watermark, x, y, {
+    baseImage.composite(watermarkResized, x, y, {
       mode: Jimp.BLEND_SOURCE_OVER,
-      opacitySource: 0.7,
+      opacitySource: 0.5
     });
 
-    const buffer = await baseImage.getBufferAsync(Jimp.MIME_PNG);
-
-    res.set("Content-Type", "image/png");
-    res.send(buffer);
+    const resultBuffer = await baseImage.getBufferAsync(Jimp.MIME_PNG);
+    res.set('Content-Type', 'image/png');
+    res.send(resultBuffer);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to process image" });
+    res.status(500).json({ error: 'Failed to apply watermark' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server is running on http://localhost:${PORT}`);
+app.get('/', (req, res) => {
+  res.send('✅ Watermark server is running');
+});
+
+app.listen(port, () => {
+  console.log(`Watermark server listening on port ${port}`);
 });
