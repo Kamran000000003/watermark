@@ -12,7 +12,7 @@ app.post("/", async (req, res) => {
     const inputBuffer = req.body;
 
     const image = await Jimp.read(inputBuffer);
-    const watermark = await Jimp.read("https://i.ibb.co/q90dQYK/watermark-demo.png");
+    const watermark = await Jimp.read("https://i.ibb.co/FKxV98y/watermark-sample.png");
 
     watermark.resize(image.bitmap.width / 4, Jimp.AUTO);
 
